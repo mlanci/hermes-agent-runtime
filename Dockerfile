@@ -289,7 +289,8 @@ RUN python3 -m pm.build_env --source /opt/hermes --python /usr/local/bin/python3
     --cache /opt/hermes/uv-cache \
     --out /opt/hermes/.venv --no-install-project --sealed --record-selection \
     --extra all --extra messaging --extra otlp --extra anthropic --extra bedrock \
-    --extra azure-identity --extra matrix --extra google-chat
+    --extra azure-identity --extra matrix --extra google-chat \
+    --extra voice --extra tts-premium
 
 # Icons render on the runtime environment: Pillow and resvg-py are core
 # dependencies. A stage of its own so the frontend stage keeps building its
@@ -423,6 +424,12 @@ RUN set -eu; \
 # /run/service/ (tmpfs) and are reconciled on container restart by
 # /etc/cont-init.d/02-reconcile-profiles (Phase 4 Task 4.0).
 COPY docker/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+# Railway builds from a tarball uploaded by the CLI; from a Windows host that
+# upload drops the executable bit on every file, and the COPY --chmod=a+rX above
+# only preserves bits that were already set. Restore them explicitly so
+# /init, the stage2 hook, the main wrapper and the s6 run/finish scripts exec.
+RUN chmod 0755 /opt/hermes/docker/*.sh && \
+    find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name finish \) -exec chmod 0755 {} +
 
 # stage2-hook handles UID/GID remap, volume chown, config seeding,
 # skills sync — all the work the old entrypoint.sh did before
@@ -505,7 +512,8 @@ RUN mkdir -p /opt/data && chmod 0644 /opt/hermes/tools/facts.json && \
     rm -f /opt/hermes/.venv/.lock /opt/hermes/pm-runtime/.lock
 # Build helpers use system Python above; TUI gateway children need the sealed runtime.
 ENV HERMES_PYTHON=/opt/hermes/.venv/bin/python
-VOLUME [ "/opt/data" ]
+# VOLUME directive removed: Railway rejects Dockerfile VOLUME and mounts its own
+# volume at /opt/data (railway volume add -m /opt/data). See railway.toml.
 
 # The image ENTRYPOINT is a tiny dispatcher rather than `/init` directly.
 # When the image really owns PID 1 (normal Docker / Podman), the dispatcher
@@ -540,4 +548,6 @@ VOLUME [ "/opt/data" ]
 # wrapper-as-ENTRYPOINT, leading-dash args like `--version` would be
 # intercepted by /init's POSIX shell.
 ENTRYPOINT [ "/opt/hermes/docker/entrypoint-dispatch.sh" ]
-CMD [ ]
+# Headless gateway by default (upstream CMD is [] → interactive `hermes`).
+# Railway has no TTY; the s6 image supervises `gateway run` automatically.
+CMD [ "gateway", "run" ]

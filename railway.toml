@@ -1,0 +1,12 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# No startCommand: the image's own ENTRYPOINT (entrypoint-dispatch.sh → s6 /init)
+# and the patched CMD ["gateway", "run"] start the supervised Hermes gateway.
+# /opt/data is a Railway volume (railway volume add -m /opt/data); it holds
+# config.yaml, auth, SOUL.md, memories, skills, sessions — everything stateful.
+# Secrets (TELEGRAM_BOT_TOKEN, ANTHROPIC_API_KEY, ...) are Railway service vars.
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
