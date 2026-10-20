@@ -35,3 +35,8 @@ docker/entrypoint.sh text eol=lf
 *.html  text eol=lf
 *.svg   text eol=lf
 *.ps1   text eol=crlf
+
+# Everything under docker/ runs inside the Linux container (s6 service
+# descriptors, cont-init hooks, extension-less scripts). Force LF regardless
+# of the host checkout settings; railway up tars the working tree as-is.
+docker/** text eol=lf
